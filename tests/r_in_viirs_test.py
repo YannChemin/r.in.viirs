@@ -32,7 +32,9 @@ def test_parse_granule():
     assert g["sat"] == "j01"
     assert g["start"] == dt.datetime(2026, 8, 30, 21, 26, 3)
     assert g["end"] == dt.datetime(2026, 8, 30, 21, 27, 26)
-    geo = riv.parse_granule(KEY.replace("SVDNB", "GDNBO").replace("c2026083022", "c2026083023"))
+    geo = riv.parse_granule(
+        KEY.replace("SVDNB", "GDNBO").replace("c2026083022", "c2026083023")
+    )
     assert geo["id"] == g["id"]
 
 
@@ -80,7 +82,9 @@ def test_nominal_time_is_local_solar():
 
 
 def test_crop_window_with_margin():
-    lat, lon = np.meshgrid(np.linspace(-10, 0, 101), np.linspace(50, 60, 101), indexing="ij")
+    lat, lon = np.meshgrid(
+        np.linspace(-10, 0, 101), np.linspace(50, 60, 101), indexing="ij"
+    )
     r0, r1, c0, c1 = riv.crop_window(lat, lon, PORT_VICTORIA, margin_px=2)
     assert lat[r0 + 2, 0] >= -5.2 and lat[r1 - 3, 0] <= -4.0
     assert lon[0, c0 + 2] >= 54.9 and lon[0, c1 - 3] <= 56.1
@@ -93,4 +97,6 @@ def test_crop_window_outside_and_fill():
 
 
 def test_grass_date_is_english():
-    assert riv.grass_date(dt.datetime(2026, 8, 30, 21, 26, 45)) == "30 Aug 2026 21:26:45"
+    assert (
+        riv.grass_date(dt.datetime(2026, 8, 30, 21, 26, 45)) == "30 Aug 2026 21:26:45"
+    )

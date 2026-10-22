@@ -22,8 +22,9 @@ tables require an account and, for scripted access, a subscription. The
 DNB Sensor Data Records themselves are public on AWS. This addon brings
 them into GRASS so that one can run one's own night-light or boat
 detection, following the same pattern as
-[r.in.sentinel](https://github.com/YannChemin/r.in.sentinel) and
-[r.in.landsat](https://github.com/YannChemin/r.in.landsat).
+[r.in.sentinel](https://github.com/YannChemin/r.in.sentinel),
+[r.in.landsat](https://github.com/YannChemin/r.in.landsat) and
+[r.in.ecostress](https://github.com/YannChemin/r.in.ecostress).
 
 ## How
 

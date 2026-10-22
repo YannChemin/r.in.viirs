@@ -60,9 +60,10 @@ so a long series can be imported in several runs; with
 <strong>-t</strong> flag skips the registration.</p>
 <h3 id="metadata">Metadata</h3>
 <p><em>r.support</em> records the satellite, the pass, the bucket, the
-granule files and the moon illumination fraction of the overpass, which
-the analysis of night lights always needs: detections of lit boats fall
-by about 95 % around full moon (Elvidge et al. 2018).</p>
+granule files and the moon illumination of the overpass (percent of the
+lunar disc lit), which the analysis of night lights always needs:
+detections of lit boats fall by about 95 % around full moon (Elvidge et
+al. 2018).</p>
 <h3 id="resampling">Resampling</h3>
 <p>The swath is gridded with the GDAL geolocation-array transformer.
 <strong>method=nearest</strong> keeps the radiances unchanged;
@@ -114,6 +115,8 @@ Marine Science</em>, 5, 132.</li>
 href="https://grass.osgeo.org/grass-stable/manuals/i.landsat.toar.html">i.landsat.toar</a>,
 <a
 href="https://grass.osgeo.org/grass-stable/manuals/r.import.html">r.import</a>,
+<a
+href="https://github.com/YannChemin/r.in.ecostress">r.in.ecostress</a>,
 <a href="https://github.com/YannChemin/r.in.landsat">r.in.landsat</a>,
 <a href="https://github.com/YannChemin/r.in.sentinel">r.in.sentinel</a>,
 <a

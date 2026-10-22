@@ -67,7 +67,7 @@ created again. The **-t** flag skips the registration.
 ### Metadata
 
 *r.support* records the satellite, the pass, the bucket, the granule
-files and the moon illumination fraction of the overpass, which the
+files and the moon illumination of the overpass (percent of the lunar disc lit), which the
 analysis of night lights always needs: detections of lit boats fall by
 about 95 % around full moon (Elvidge et al. 2018).
 
@@ -131,6 +131,7 @@ r.in.viirs -p start=2026-08-31 end=2026-08-31
 
 *[i.landsat.toar](https://grass.osgeo.org/grass-stable/manuals/i.landsat.toar.html),
 [r.import](https://grass.osgeo.org/grass-stable/manuals/r.import.html),
+[r.in.ecostress](https://github.com/YannChemin/r.in.ecostress),
 [r.in.landsat](https://github.com/YannChemin/r.in.landsat),
 [r.in.sentinel](https://github.com/YannChemin/r.in.sentinel),
 [r.timestamp](https://grass.osgeo.org/grass-stable/manuals/r.timestamp.html),

@@ -463,7 +463,8 @@ def read_granule(remote, bucket, sdr, geo, layers, bounds):
         r0, r1, c0, c1 = win
         out["lat"] = lat[r0:r1, c0:c1]
         out["lon"] = lon[r0:r1, c0:c1]
-        out["moon_fraction"] = float(h[f"{GEO_ALL}/MoonIllumFraction"][0])
+        # MoonIllumFraction is the illuminated part of the lunar disc in percent.
+        out["moon_percent"] = float(h[f"{GEO_ALL}/MoonIllumFraction"][0])
         for name in layers:
             prod, path = LAYER_SRC[name]
             if prod == GEO:
@@ -703,7 +704,7 @@ def main():
         if not swaths:
             continue
         mid = hits[0]["start"] + (hits[-1]["end"] - hits[0]["start"]) / 2
-        moon = swaths[0]["moon_fraction"]
+        moon = swaths[0]["moon_percent"]
         base = f"{prefix}_{sat}_{mid:%Y%m%dT%H%M%S}"
         with tempfile.TemporaryDirectory(
             dir=os.path.dirname(gs.tempfile(create=False))
@@ -723,7 +724,7 @@ def main():
                     "title": f"VIIRS DNB {name}, {SAT_NAME[sat]}, {wh} pass {mid:%Y-%m-%d %H:%M:%S} UTC",
                     "source1": bucket,
                     "source2": ", ".join(os.path.basename(g["key"]) for g in hits),
-                    "description": f"moon_illumination_fraction={moon:.4f} method={method} resolution={resolution} m",
+                    "description": f"moon_illumination_percent={moon:.1f} method={method} resolution={resolution} m",
                 }
                 if name in LAYER_UNITS:
                     support["units"] = LAYER_UNITS[name]
@@ -735,7 +736,7 @@ def main():
                 gs.raster_history(map_name, overwrite=True)
                 registry[name].append(map_name)
         gs.verbose(
-            _("{}: {} granule(s), moon illumination {:.0%}").format(
+            _("{}: {} granule(s), moon illumination {:.0f} %").format(
                 base, len(hits), moon
             )
         )
