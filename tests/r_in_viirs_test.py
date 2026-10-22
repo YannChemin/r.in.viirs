@@ -100,3 +100,23 @@ def test_grass_date_is_english():
     assert (
         riv.grass_date(dt.datetime(2026, 8, 30, 21, 26, 45)) == "30 Aug 2026 21:26:45"
     )
+
+
+def test_ring_on_far_side_does_not_cover():
+    # Suomi-NPP day granule over the Pacific at the time of the Seychelles
+    # night pass (2024-09-30 21:47 UTC): it must not match the region.
+    lon = [-111.73, -111.11, -110.46, -124.23, -138.14, -138.59, -139.07, -125.36]
+    lat = [-2.63, -5.18, -7.6, -9.92, -11.79, -9.34, -6.76, -4.9]
+    assert not riv.ring_covers(PORT_VICTORIA, lon, lat)
+    assert not riv.point_in_ring(55.5, -4.6, lon, lat)
+
+
+def test_ring_x_keeps_antimeridian_ring_whole():
+    xs = riv.ring_x([170.0, -170.0, -170.0, 170.0], -175.0)
+    assert max(xs) - min(xs) == 20.0
+    assert min(xs) <= -175.0 <= max(xs)
+
+
+def test_wrap180():
+    assert riv.wrap180(190.0) == -170.0
+    assert riv.wrap180(-180.0) == -180.0

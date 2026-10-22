@@ -167,6 +167,8 @@ NODE_HOURS = {"night": 1.5, "day": 13.5}
 # reaches about 1500 km to each side, about 1 h of local time at the equator.
 WINDOW_S = 75 * 60
 MAX_PROBES = 10
+# Earth rotation during half an orbit, in degrees of longitude.
+HALF_ORBIT_ROTATION = 360.0 * (ORBIT_S / 2) / 86164.1
 BIG_BLOCK = 4 * 1024 * 1024
 LAYER_SRC = {
     "dnb": (SDR, "All_Data/VIIRS-DNB-SDR_All/Radiance"),
@@ -233,14 +235,31 @@ def list_day(bucket, product, day):
     return out
 
 
-def unwrap(lons, ref):
-    """Shift longitudes by 360 so they lie within 180 degrees of ref."""
-    return [x - 360.0 * round((x - ref) / 360.0) for x in lons]
+def wrap180(x):
+    """Longitude difference brought into [-180, 180)."""
+    return (x + 180.0) % 360.0 - 180.0
+
+
+def ring_x(ring_lon, ref):
+    """Continuous ring longitudes, shifted as a whole next to ref.
+
+    Each vertex is unwrapped against the previous one, so a ring crossing
+    the antimeridian stays in one piece; the ring is then moved by a whole
+    turn so that its centre lies within 180 degrees of ref. Unwrapping each
+    vertex against ref instead would split a ring on the far side of the
+    globe into a band covering every longitude.
+    """
+    xs = [ring_lon[0]]
+    for x in ring_lon[1:]:
+        xs.append(x - 360.0 * round((x - xs[-1]) / 360.0))
+    centre = sum(xs) / len(xs)
+    shift = 360.0 * round((ref - centre) / 360.0)
+    return [x + shift for x in xs]
 
 
 def point_in_ring(lon, lat, ring_lon, ring_lat):
     """Ray-casting test of a point against a granule G-Ring polygon."""
-    xs = unwrap(ring_lon, lon)
+    xs = ring_x(ring_lon, lon)
     inside = False
     n = len(xs)
     for i in range(n):
@@ -268,7 +287,7 @@ def ring_covers(bounds, ring_lon, ring_lat):
     corners = [(w, s), (e, s), (e, n), (w, n)]
     if any(point_in_ring(x, y, ring_lon, ring_lat) for x, y in corners):
         return True
-    ring = list(zip(unwrap(ring_lon, (w + e) / 2.0), ring_lat))
+    ring = list(zip(ring_x(ring_lon, (w + e) / 2.0), ring_lat))
     if any(w <= x <= e and s <= y <= n for x, y in ring):
         return True
     for i in range(len(ring)):
@@ -363,9 +382,27 @@ def find_overpasses(remote, bucket, sat, day, bounds, which, listing):
             hits.append(idx)
             break
         rlat = sum(r["lat"]) / len(r["lat"])
-        rlon = sum(unwrap(r["lon"], lon_c)) / len(r["lon"])
+        rlon = sum(ring_x(r["lon"], lon_c)) / len(r["lon"])
         height = max(r["lat"]) - min(r["lat"])
         ascending = which == "day"
+        if abs(wrap180(lon_c - rlon)) > 90.0:
+            # The region lies between two ground tracks, so its pass can be
+            # up to half an orbit from the nominal time, and this granule is
+            # on the other side of the globe. Half an orbit later the track
+            # is at the antipode, shifted west by the Earth's rotation.
+            half = round(ORBIT_S / 2 / GRANULE_S)
+            later = wrap180(lon_c - (rlon + 180.0 - HALF_ORBIT_ROTATION))
+            earlier = wrap180(lon_c - (rlon + 180.0 + HALF_ORBIT_ROTATION))
+            step = half if abs(later) < abs(earlier) else -half
+            target = cands[idx]["start"] + dt.timedelta(seconds=step * GRANULE_S)
+            new = min(
+                range(len(cands)),
+                key=lambda i: abs((cands[i]["start"] - target).total_seconds()),
+            )
+            if new == idx:
+                break
+            idx = new
+            continue
         # Granules to move along the pass to reach the region latitude.
         step = round((lat_c - rlat) / max(height, 1.0))
         if step == 0 and not min(r["lat"]) <= lat_c <= max(r["lat"]):
