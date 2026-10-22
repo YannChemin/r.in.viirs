@@ -1,0 +1,124 @@
+<h2 id="description">DESCRIPTION</h2>
+<p><em>r.in.viirs</em> queries, downloads and imports VIIRS Day/Night
+Band (DNB) granules of Suomi-NPP, NOAA-20 and NOAA-21 into the current
+GRASS GIS project. The data come from the NOAA Open Data Dissemination
+(NODD) buckets on Amazon Web Services, which need no account. The swath
+is cropped to the current region and gridded onto it in the project
+coordinate reference system, so only the region is kept, never the
+granule files.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">g.region</span> n=9551000 s=9431000 w=276000 e=396000 res=750</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># List the night overpasses over the region, without importing.</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">r.in.viirs</span> <span class="at">-l</span> start=2026-08-01 end=2026-08-31</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Import radiance and lunar zenith angle for both satellites.</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">r.in.viirs</span> start=2026-08-01 end=2026-08-31 satellite=npp,j01 <span class="dt">\</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  layers=dnb,lunar_zenith method=max</span></code></pre></div>
+<p>The DNB is a panchromatic band (500-900 nm) sensitive enough to
+record city lights, gas flares, fires and the lights of fishing boats at
+night. Its pixels are about 742 m on a side at all scan angles.</p>
+<h3 id="finding-the-granules">Finding the granules</h3>
+<p>The buckets hold about 1000 granules (85 s each) per satellite and
+day. <em>r.in.viirs</em> does not open them all. The satellites are on
+sun-synchronous orbits that cross the equator at about 01:30 (night,
+descending) and 13:30 (day, ascending) local solar time, so the overpass
+time over the region centre is predicted from its longitude. The module
+then reads the G-Ring polygon (the corners of the granule) of the
+granule nearest that time, which costs a few HTTP range requests and no
+data, and steps along the pass or to the next orbit until a G-Ring
+intersects the region. One night or day is resolved in two to six such
+reads per satellite.</p>
+<p>Dates are <strong>local solar dates of the overpass</strong>: with
+<code>pass=night</code>, the date 2026-08-31 at 55°E gives the pass of
+about 01:30 local time on 31 August, which is 21:48 UTC on 30
+August.</p>
+<h3 id="layers">Layers</h3>
+<ul>
+<li><strong>dnb</strong>: radiance in nW cm-2 sr-1 (the SDR values in W
+cm-2 sr-1 multiplied by 1e9, the unit of the EOG VIIRS Boat Detection
+product). Fill values become null.</li>
+<li><strong>qf</strong>: DNB SDR quality flags
+(<code>QF1_VIIRSDNBSDR</code>), always gridded with nearest
+neighbour.</li>
+<li><strong>lunar_zenith</strong>, <strong>satellite_zenith</strong>,
+<strong>solar_zenith</strong>: angles in degrees, from the geolocation
+granule.</li>
+</ul>
+<p>Each overpass gives one map per layer, named
+<code>&lt;output&gt;_&lt;satellite&gt;_&lt;YYYYmmddTHHMMSS&gt;_&lt;layer&gt;</code>
+after the UTC mid time of the overpass. The granules of one overpass
+that overlap the region are mosaicked first.</p>
+<h3 id="time-stamps-and-space-time-datasets">Time stamps and space-time
+datasets</h3>
+<p>Every map gets the UTC mid time of its overpass as its time stamp
+(<em>r.timestamp</em>). By default the maps are also registered in one
+space-time raster dataset per layer,
+<code>&lt;strds&gt;_&lt;layer&gt;</code> (<code>viirs_dnb</code>,
+<code>viirs_lunar_zenith</code>, ...). An existing dataset is extended,
+so a long series can be imported in several runs; with
+<strong>--overwrite</strong> it is created again. The
+<strong>-t</strong> flag skips the registration.</p>
+<h3 id="metadata">Metadata</h3>
+<p><em>r.support</em> records the satellite, the pass, the bucket, the
+granule files and the moon illumination fraction of the overpass, which
+the analysis of night lights always needs: detections of lit boats fall
+by about 95 % around full moon (Elvidge et al. 2018).</p>
+<h3 id="resampling">Resampling</h3>
+<p>The swath is gridded with the GDAL geolocation-array transformer.
+<strong>method=nearest</strong> keeps the radiances unchanged;
+<strong>method=max</strong> keeps point sources such as boat lights when
+the output cells are larger than the DNB pixel;
+<strong>method=average</strong> smooths. The default resolution is 750
+m; at finer resolutions the cells repeat the DNB pixels.</p>
+<h2 id="notes">NOTES</h2>
+<p>The module reads the HDF5 granules over HTTP and transfers only the
+datasets it needs. The datasets are compressed as a single block, so
+each read fetches the whole array of the granule (about 3 MB each for
+latitude, longitude and radiance; 15 to 20 MB per granule for the DNB
+alone). The <strong>-l</strong> flag lists overpasses without reading
+any array.</p>
+<p>The NODD buckets are a near-real-time and archive service of NOAA.
+The default bucket template is
+<code>https://noaa-nesdis-{sat}-pds.s3.amazonaws.com</code> with
+<code>{sat}</code> replaced by <code>snpp</code>, <code>n20</code> or
+<code>n21</code>; the <strong>bucket</strong> option accepts a mirror
+with the same layout.</p>
+<p>Python dependencies: numpy, h5py, fsspec with aiohttp, and the GDAL
+Python bindings.</p>
+<p>Progress is reported through the GRASS percentage messages, which
+tools such as <a
+href="https://github.com/YannChemin/MetaMonitor">MetaMonitor</a> pick
+up.</p>
+<h2 id="examples">EXAMPLES</h2>
+<p>Night radiance over Port Victoria (Seychelles) for one week, gridded
+at 750 m with the maximum rule, in a UTM zone 40S project:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">g.region</span> n=9551000 s=9431000 w=276000 e=396000 res=750</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">r.in.viirs</span> start=2026-08-25 end=2026-08-31 satellite=npp,j01,j02 <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  layers=dnb,lunar_zenith method=max output=syc</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">t.rast.list</span> syc_dnb</span></code></pre></div>
+<p>Print the longitude/latitude bounds used for the query:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">r.in.viirs</span> <span class="at">-p</span> start=2026-08-31 end=2026-08-31</span></code></pre></div>
+<h2 id="references">REFERENCES</h2>
+<ul>
+<li>Elvidge, C. D., Zhizhin, M., Baugh, K., Hsu, F.-C. (2015). Automatic
+boat identification system for VIIRS low light imaging data. <em>Remote
+Sensing</em>, 7(3), 3020-3036.</li>
+<li>Elvidge, C. D., Ghosh, T., Baugh, K., Zhizhin, M., Hsu, F.-C., et
+al. (2018). Rating the effectiveness of fishery closures with Visible
+Infrared Imaging Radiometer Suite boat detection data. <em>Frontiers in
+Marine Science</em>, 5, 132.</li>
+<li>NOAA Open Data Dissemination program, JPSS VIIRS SDR on AWS.</li>
+</ul>
+<h2 id="see-also">SEE ALSO</h2>
+<p><em><a
+href="https://grass.osgeo.org/grass-stable/manuals/i.landsat.toar.html">i.landsat.toar</a>,
+<a
+href="https://grass.osgeo.org/grass-stable/manuals/r.import.html">r.import</a>,
+<a href="https://github.com/YannChemin/r.in.landsat">r.in.landsat</a>,
+<a href="https://github.com/YannChemin/r.in.sentinel">r.in.sentinel</a>,
+<a
+href="https://grass.osgeo.org/grass-stable/manuals/r.timestamp.html">r.timestamp</a>,
+<a
+href="https://grass.osgeo.org/grass-stable/manuals/t.register.html">t.register</a></em></p>
+<h2 id="authors">AUTHORS</h2>
+<p>Yann Chemin</p>
